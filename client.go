@@ -23,11 +23,18 @@ import (
 	"github.com/jquiterio/uuid"
 )
 
+type Message struct {
+	SubscriberID string      `json:"subscriber_id"`
+	ID           string      `json:"id"`
+	Topic        string      `json:"topic"`
+	Type         string      `json:"type"`
+	Data         interface{} `json:"data"`
+}
 type Client struct {
 	ClientID       string
 	Topics         []string
 	HubAddr        string
-	MessageHandler func(msg mhub.Message)
+	MessageHandler func(msg Message)
 	Conn           *http.Client
 	Secure         bool
 	Debug          bool
@@ -194,7 +201,7 @@ func (c *Client) GetMessages() {
 	}
 	dec := json.NewDecoder(resp.Body)
 	for {
-		var message mhub.Message
+		var message Message
 		err := dec.Decode(&message)
 		if err != nil {
 			if err == io.EOF {
