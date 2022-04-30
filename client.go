@@ -19,7 +19,6 @@ import (
 	"net/url"
 
 	"github.com/golang/glog"
-	"github.com/jquiterio/mhub"
 	"github.com/jquiterio/uuid"
 )
 
@@ -30,6 +29,29 @@ type Message struct {
 	Type         string      `json:"type"`
 	Data         interface{} `json:"data"`
 }
+
+func NewMessage(subscriberID, topic, typ string, data interface{}) *Message {
+	return &Message{
+		SubscriberID: subscriberID,
+		ID:           uuid.NewV4().String(),
+		Topic:        topic,
+		Type:         typ,
+		Data:         data,
+	}
+}
+
+func (m *Message) FromMap(msg map[string]interface{}) error {
+	m.SubscriberID = msg["subscriber_id"].(string)
+	m.ID = msg["id"].(string)
+	m.Data = msg["msg"]
+	m.Topic = msg["topic"].(string)
+	return nil
+}
+
+func (m *Message) ToJSON() ([]byte, error) {
+	return json.Marshal(m.ToMap())
+}
+
 type Client struct {
 	ClientID       string
 	Topics         []string
@@ -157,13 +179,7 @@ func (c *Client) Unsubscribe(topics []string) (ok bool) {
 
 func (c *Client) Publish(topic string, msg interface{}) {
 	url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
-	message := mhub.NewMessage(c.ClientID, topic, "publish", msg)
-	// body, err := json.Marshal(map[string]interface{}{
-	// 	"topic": topic,
-	// 	"type":  "publish",
-	// 	"data":  msg,
-	// 	"id":    uuid.New().String(),
-	// })
+	message := NewMessage(c.ClientID, topic, "publish", msg)
 	body, err := message.ToJSON()
 	if err != nil {
 		glog.Fatal(err)
