@@ -48,6 +48,15 @@ func (m *Message) FromMap(msg map[string]interface{}) error {
 	return nil
 }
 
+func (m *Message) ToMap() map[string]interface{} {
+	return map[string]interface{}{
+		"subscriber_id": m.SubscriberID,
+		"id":            m.ID,
+		"topic":         m.Topic,
+		"data":          m.Data,
+	}
+}
+
 func (m *Message) ToJSON() ([]byte, error) {
 	return json.Marshal(m.ToMap())
 }
