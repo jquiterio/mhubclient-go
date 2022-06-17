@@ -17,6 +17,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/jquiterio/uuid"
@@ -208,6 +209,54 @@ func (c *Client) Publish(topic string, msg interface{}) {
 	}
 }
 
+func (c *Client) PublishPlain(msg string) {
+	var topic string
+	msgSplit := strings.Split(msg, ".")
+	if len(msgSplit) == 3 {
+		topic = msgSplit[0]
+		url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(msg)))
+		if err == nil {
+			req.Header.Set("X-Subscriber-ID", c.ClientID)
+			req.Header.Set("Content-Type", "text/plain")
+			resp, err := c.Conn.Do(req)
+			if resp.StatusCode != http.StatusCreated {
+				glog.Fatal("unexpected status code: ", resp.StatusCode)
+			}
+		}
+	}
+}
+
+func (c *Client) GetPlainMessages() {
+	url := c.HubAddr
+	req, err := http.NewRequest("GET", url, nil)
+	if err == nil {
+		req.Header.Set("X-Subscriber-ID", c.ClientID)
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			bodybytes, err := io.ReadAll(resp.Body)
+			if err == nil {
+				msg := string(bodybytes)
+				msgSplit := strings.Split(msg, ".")
+				if len(msgSplit) == 3 {
+					topic := msgSplit[0]
+					action := msgSplit[1]
+					objid := msgSplit[2]
+					if c.MessageHandler != nil {
+						message := Message{
+							SubscriberID: c.ClientID,
+							Topic:        topic,
+							Action:       action,
+							ObjID:        objid,
+						}
+						c.MessageHandler(message)
+					}
+				}
+			}
+		}
+	}
+}
+
 func (c *Client) GetMessages() {
 	url := c.HubAddr
 	req, err := http.NewRequest("GET", url, nil)
@@ -228,18 +277,13 @@ func (c *Client) GetMessages() {
 	for {
 		var message Message
 		err := dec.Decode(&message)
-		if err != nil {
-			if err == io.EOF {
-				glog.Info("Error on decoding the Response from ", url, ":", err)
-				break
+		if err == nil {
+			if c.MessageHandler != nil {
+				c.MessageHandler(message)
 			}
-			glog.Info("Error on decoding the Response message: ", err)
-		}
-		if c.MessageHandler != nil {
-			c.MessageHandler(message)
-		}
-		if c.Debug {
-			glog.Info(fmt.Sprintf("%s: %s", message.Topic, message.Data))
+			if c.Debug {
+				glog.Info(fmt.Sprintf("%s: %s", message.Topic, message.Data))
+			}
 		}
 	}
 }
