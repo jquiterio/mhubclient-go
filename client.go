@@ -212,17 +212,17 @@ func (c *Client) GetMessages() {
 	url := c.HubAddr
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		glog.Fatal("Error on creating the Request ", url, ":", err)
+		glog.Info("Error on creating the Request ", url, ":", err)
 	}
 	fmt.Println("Topics:")
 	for _, t := range c.Topics {
-		fmt.Println(t)
+		glog.Info(t)
 	}
 	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.Conn.Do(req)
 	if err != nil {
-		glog.Fatal("Error on sending the Request ", url, ":", err)
+		glog.Info("Error on sending the Request ", url, ":", err)
 	}
 	dec := json.NewDecoder(resp.Body)
 	for {
@@ -232,7 +232,7 @@ func (c *Client) GetMessages() {
 			if err == io.EOF {
 				break
 			}
-			glog.Fatal("Error on decoding the Response message: ", err)
+			glog.Info("Error on decoding the Response message: ", err)
 		}
 		if c.MessageHandler != nil {
 			c.MessageHandler(message)
