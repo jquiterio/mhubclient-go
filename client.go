@@ -246,8 +246,7 @@ func (c *Client) GetPlainMessages() {
 						message := Message{
 							SubscriberID: c.ClientID,
 							Topic:        topic,
-							Action:       action,
-							ObjID:        objid,
+							Data:         action + "." + objid,
 						}
 						c.MessageHandler(message)
 					}
