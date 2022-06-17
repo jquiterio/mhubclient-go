@@ -219,7 +219,7 @@ func (c *Client) PublishPlain(msg string) {
 		if err == nil {
 			req.Header.Set("X-Subscriber-ID", c.ClientID)
 			req.Header.Set("Content-Type", "text/plain")
-			resp, err := c.Conn.Do(req)
+			resp, _ := c.Conn.Do(req)
 			if resp.StatusCode != http.StatusCreated {
 				glog.Fatal("unexpected status code: ", resp.StatusCode)
 			}
@@ -232,23 +232,26 @@ func (c *Client) GetPlainMessages() {
 	req, err := http.NewRequest("GET", url, nil)
 	if err == nil {
 		req.Header.Set("X-Subscriber-ID", c.ClientID)
-		defer resp.Body.Close()
-		if resp.StatusCode == http.StatusOK {
-			bodybytes, err := io.ReadAll(resp.Body)
-			if err == nil {
-				msg := string(bodybytes)
-				msgSplit := strings.Split(msg, ".")
-				if len(msgSplit) == 3 {
-					topic := msgSplit[0]
-					action := msgSplit[1]
-					objid := msgSplit[2]
-					if c.MessageHandler != nil {
-						message := Message{
-							SubscriberID: c.ClientID,
-							Topic:        topic,
-							Data:         action + "." + objid,
+		resp, err := c.Conn.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				bodybytes, err := io.ReadAll(resp.Body)
+				if err == nil {
+					msg := string(bodybytes)
+					msgSplit := strings.Split(msg, ".")
+					if len(msgSplit) == 3 {
+						topic := msgSplit[0]
+						action := msgSplit[1]
+						objid := msgSplit[2]
+						if c.MessageHandler != nil {
+							message := Message{
+								SubscriberID: c.ClientID,
+								Topic:        topic,
+								Data:         action + "." + objid,
+							}
+							c.MessageHandler(message)
 						}
-						c.MessageHandler(message)
 					}
 				}
 			}
