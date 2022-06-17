@@ -212,7 +212,6 @@ func (c *Client) Publish(topic string, msg interface{}) {
 
 func (c *Client) PublishPlain(msg string) {
 	var topic string
-	url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
 	msgSplit := strings.Split(msg, ".")
 	if len(msgSplit) == 3 {
 		topic = msgSplit[0]
@@ -228,6 +227,7 @@ func (c *Client) PublishPlain(msg string) {
 		if err != nil {
 			glog.Fatal(err)
 		}
+		url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
 
 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 		if err != nil {
