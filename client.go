@@ -194,6 +194,7 @@ func (c *Client) Publish(topic string, msg interface{}) {
 	if err != nil {
 		glog.Fatal(err)
 	}
+
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		glog.Fatal(err)
@@ -211,18 +212,35 @@ func (c *Client) Publish(topic string, msg interface{}) {
 
 func (c *Client) PublishPlain(msg string) {
 	var topic string
+	url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
 	msgSplit := strings.Split(msg, ".")
 	if len(msgSplit) == 3 {
 		topic = msgSplit[0]
-		url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(msg)))
-		if err == nil {
-			req.Header.Set("X-Subscriber-ID", c.ClientID)
-			req.Header.Set("Content-Type", "text/plain")
-			resp, _ := c.Conn.Do(req)
-			if resp.StatusCode != http.StatusCreated {
-				glog.Fatal("unexpected status code: ", resp.StatusCode)
-			}
+		action := msgSplit[1]
+		objid := msgSplit[2]
+		msg := Message{
+			SubscriberID: c.ClientID,
+			Topic:        topic,
+			Data:         action + "." + objid,
+		}
+		body, err := msg.ToJSON()
+
+		if err != nil {
+			glog.Fatal(err)
+		}
+
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+		if err != nil {
+			glog.Fatal(err)
+		}
+		req.Header.Set("X-Subscriber-ID", c.ClientID)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := c.Conn.Do(req)
+		if err != nil {
+			glog.Fatal(err)
+		}
+		if resp.StatusCode != http.StatusCreated {
+			glog.Fatal("unexpected status code: ", resp.StatusCode)
 		}
 	}
 }
