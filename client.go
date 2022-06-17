@@ -231,7 +231,7 @@ func (c *Client) GetMessages() {
 		if err != nil {
 			if err == io.EOF {
 				glog.Info("Error on decoding the Response from ", url, ":", err)
-				continue
+				break
 			}
 			glog.Info("Error on decoding the Response message: ", err)
 		}
