@@ -233,24 +233,25 @@ func (c *Client) GetPlainMessages() {
 	if err == nil {
 		req.Header.Set("X-Subscriber-ID", c.ClientID)
 		resp, err := c.Conn.Do(req)
-		if err == nil {
-			defer resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				bodybytes, err := io.ReadAll(resp.Body)
-				if err == nil {
-					msg := string(bodybytes)
-					msgSplit := strings.Split(msg, ".")
-					if len(msgSplit) == 3 {
-						topic := msgSplit[0]
-						action := msgSplit[1]
-						objid := msgSplit[2]
-						if c.MessageHandler != nil {
-							message := Message{
-								SubscriberID: c.ClientID,
-								Topic:        topic,
-								Data:         action + "." + objid,
+		for {
+			if err == nil {
+				if resp.StatusCode == http.StatusOK {
+					bodybytes, err := io.ReadAll(resp.Body)
+					if err == nil {
+						msg := string(bodybytes)
+						msgSplit := strings.Split(msg, ".")
+						if len(msgSplit) == 3 {
+							topic := msgSplit[0]
+							action := msgSplit[1]
+							objid := msgSplit[2]
+							if c.MessageHandler != nil {
+								message := Message{
+									SubscriberID: c.ClientID,
+									Topic:        topic,
+									Data:         action + "." + objid,
+								}
+								c.MessageHandler(message)
 							}
-							c.MessageHandler(message)
 						}
 					}
 				}
