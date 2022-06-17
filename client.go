@@ -216,7 +216,7 @@ func (c *Client) GetMessages() {
 	}
 	fmt.Println("Topics:")
 	for _, t := range c.Topics {
-		fmt.Println(t)s
+		fmt.Println(t)
 	}
 	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	req.Header.Set("Content-Type", "application/json")
