@@ -212,17 +212,17 @@ func (c *Client) GetMessages() {
 	url := c.HubAddr
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		glog.Fatal(err)
+		glog.Fatal("Error on creating the Request ", url, ":", err)
 	}
 	fmt.Println("Topics:")
 	for _, t := range c.Topics {
-		fmt.Println(t)
+		fmt.Println(t)s
 	}
 	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.Conn.Do(req)
 	if err != nil {
-		glog.Fatal(err)
+		glog.Fatal("Error on sending the Request ", url, ":", err)
 	}
 	dec := json.NewDecoder(resp.Body)
 	for {
@@ -232,7 +232,7 @@ func (c *Client) GetMessages() {
 			if err == io.EOF {
 				break
 			}
-			glog.Fatal(err)
+			glog.Fatal("Error on decoding the Response message: ", err)
 		}
 		if c.MessageHandler != nil {
 			c.MessageHandler(message)
@@ -247,12 +247,12 @@ func (c *Client) Me() {
 	url := fmt.Sprintf("%s/me", c.HubAddr)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		glog.Fatal(err)
+		glog.Fatal("Error on creating the Request ", url, ":", err)
 	}
 	req.Header.Set("X-Subscriber-ID", c.ClientID)
 	resp, err := c.Conn.Do(req)
 	if err != nil {
-		glog.Fatal(err)
+		glog.Fatal("Error on sending the Request ", url, ":", err)
 	}
 	dec := json.NewDecoder(resp.Body)
 	for {
@@ -262,7 +262,7 @@ func (c *Client) Me() {
 			if err == io.EOF {
 				break
 			}
-			glog.Fatal(err)
+			glog.Fatal("Error on decoding the Response message: ", err)
 		}
 	}
 }
