@@ -252,6 +252,7 @@ func (c *Client) GetPlainMessages() {
 					bodybytes, err := io.ReadAll(resp.Body)
 					if err == nil {
 						msg := string(bodybytes)
+						fmt.Println(msg)
 						// msgSplit := strings.Split(msg, ".")
 						// if len(msgSplit) == 3 {
 						// 	topic := msgSplit[0]
