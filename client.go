@@ -135,7 +135,7 @@ func (c *Client) Subscribe() (ok bool) {
 		glog.Error("no topics to subscribe")
 		return false
 	} else if len(c.Topics) > 0 {
-		topics = fmt.Printf(strings.Join(reg[:], ","))
+		topics = fmt.Sprint(strings.Join(reg[:], ","))
 		//body, _ = json.Marshal(c.Topics)
 		body, _ = []byte(topics)
 	}
