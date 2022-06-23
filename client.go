@@ -24,49 +24,45 @@ import (
 )
 
 type Message struct {
-	SubscriberID string      `json:"subscriber_id"`
-	ID           string      `json:"id"`
-	Topic        string      `json:"topic"`
-	Type         string      `json:"type"`
-	Data         interface{} `json:"data"`
+	Topic   string `json:"topic"`
+	Payload string `json:"payload"`
 }
 
-func NewMessage(subscriberID, topic, typ string, data interface{}) *Message {
-	return &Message{
-		SubscriberID: subscriberID,
-		ID:           uuid.NewV4().String(),
-		Topic:        topic,
-		Type:         typ,
-		Data:         data,
-	}
-}
+// func NewMessage(subscriberID, topic, payload string) *Message {
+// 	return &Message{
+// 		SubscriberID: subscriberID,
+// 		ID:           uuid.NewV4().String(),
+// 		Topic:        topic,
+// 		Data:         data,
+// 	}
+// }
 
-func (m *Message) FromMap(msg map[string]interface{}) error {
-	m.SubscriberID = msg["subscriber_id"].(string)
-	m.ID = msg["id"].(string)
-	m.Data = msg["msg"]
-	m.Topic = msg["topic"].(string)
-	return nil
-}
+// func (m *Message) FromMap(msg map[string]interface{}) error {
+// 	m.SubscriberID = msg["subscriber_id"].(string)
+// 	m.ID = msg["id"].(string)
+// 	m.Payload = msg["payload"].(string)
+// 	m.Topic = msg["topic"].(string)
+// 	return nil
+// }
 
-func (m *Message) ToMap() map[string]interface{} {
-	return map[string]interface{}{
-		"subscriber_id": m.SubscriberID,
-		"id":            m.ID,
-		"topic":         m.Topic,
-		"data":          m.Data,
-	}
-}
+// func (m *Message) ToMap() map[string]interface{} {
+// 	return map[string]interface{}{
+// 		"subscriber_id": m.SubscriberID,
+// 		"id":            m.ID,
+// 		"topic":         m.Topic,
+// 		"payload":       m.Payload,
+// 	}
+// }
 
-func (m *Message) ToJSON() ([]byte, error) {
-	return json.Marshal(m.ToMap())
-}
+// func (m *Message) ToJSON() ([]byte, error) {
+// 	return json.Marshal(m.ToMap())
+// }
 
 type Client struct {
 	ClientID       string
 	Topics         []string
 	HubAddr        string
-	MessageHandler func(msg Message)
+	MessageHandler func(msg string)
 	Conn           *http.Client
 	Secure         bool
 	Debug          bool
@@ -134,11 +130,14 @@ func (c *Client) AddTopic(topic []string) (ok bool) {
 func (c *Client) Subscribe() (ok bool) {
 	url := fmt.Sprintf("%s/subscribe", c.HubAddr)
 	var body []byte
+	var topics string
 	if len(c.Topics) == 0 {
 		glog.Error("no topics to subscribe")
 		return false
 	} else if len(c.Topics) > 0 {
-		body, _ = json.Marshal(c.Topics)
+		topics = fmt.Printf(strings.Join(reg[:], ","))
+		//body, _ = json.Marshal(c.Topics)
+		body, _ = []byte(topics)
 	}
 	fmt.Println("Topics:" + string(body))
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
@@ -187,10 +186,10 @@ func (c *Client) Unsubscribe(topics []string) (ok bool) {
 	return true
 }
 
-func (c *Client) Publish(topic string, msg interface{}) {
+func (c *Client) Publish(topic, payload string) {
 	url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
 	message := NewMessage(c.ClientID, topic, "publish", msg)
-	body, err := message.ToJSON()
+	body, err := []byte(payload)
 	if err != nil {
 		glog.Fatal(err)
 	}
@@ -210,40 +209,40 @@ func (c *Client) Publish(topic string, msg interface{}) {
 	}
 }
 
-func (c *Client) PublishPlain(msg string) {
-	var topic string
-	msgSplit := strings.Split(msg, ".")
-	if len(msgSplit) == 3 {
-		topic = msgSplit[0]
-		action := msgSplit[1]
-		objid := msgSplit[2]
-		msg := Message{
-			SubscriberID: c.ClientID,
-			Topic:        topic,
-			Data:         action + "." + objid,
-		}
-		body, err := msg.ToJSON()
+// func (c *Client) PublishPlain(msg string) {
+// 	var topic string
+// 	msgSplit := strings.Split(msg, ".")
+// 	if len(msgSplit) == 3 {
+// 		topic = msgSplit[0]
+// 		action := msgSplit[1]
+// 		objid := msgSplit[2]
+// 		msg := Message{
+// 			SubscriberID: c.ClientID,
+// 			Topic:        topic,
+// 			Data:         action + "." + objid,
+// 		}
+// 		body, err := msg.ToJSON()
 
-		if err != nil {
-			glog.Fatal(err)
-		}
-		url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
+// 		if err != nil {
+// 			glog.Fatal(err)
+// 		}
+// 		url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
 
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
-		if err != nil {
-			glog.Fatal(err)
-		}
-		req.Header.Set("X-Subscriber-ID", c.ClientID)
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := c.Conn.Do(req)
-		if err != nil {
-			glog.Fatal(err)
-		}
-		if resp.StatusCode != http.StatusCreated {
-			glog.Fatal("unexpected status code: ", resp.StatusCode)
-		}
-	}
-}
+// 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+// 		if err != nil {
+// 			glog.Fatal(err)
+// 		}
+// 		req.Header.Set("X-Subscriber-ID", c.ClientID)
+// 		req.Header.Set("Content-Type", "application/json")
+// 		resp, err := c.Conn.Do(req)
+// 		if err != nil {
+// 			glog.Fatal(err)
+// 		}
+// 		if resp.StatusCode != http.StatusCreated {
+// 			glog.Fatal("unexpected status code: ", resp.StatusCode)
+// 		}
+// 	}
+// }
 
 func (c *Client) GetPlainMessages() {
 	url := c.HubAddr
@@ -278,36 +277,32 @@ func (c *Client) GetPlainMessages() {
 	}
 }
 
-func (c *Client) GetMessages() {
-	url := c.HubAddr
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		glog.Info("Error on creating the Request ", url, ":", err)
-	}
-	fmt.Println("Topics:")
-	for _, t := range c.Topics {
-		glog.Info(t)
-	}
-	req.Header.Set("X-Subscriber-ID", c.ClientID)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.Conn.Do(req)
-	if err != nil {
-		glog.Info("Error on sending the Request ", url, ":", err)
-	}
-	dec := json.NewDecoder(resp.Body)
-	for {
-		var message Message
-		err := dec.Decode(&message)
-		if err == nil {
-			if c.MessageHandler != nil {
-				c.MessageHandler(message)
-			}
-			if c.Debug {
-				glog.Info(fmt.Sprintf("%s: %s", message.Topic, message.Data))
-			}
-		}
-	}
-}
+// func (c *Client) GetMessages() {
+// 	url := c.HubAddr
+// 	req, err := http.NewRequest("GET", url, nil)
+// 	if err != nil {
+// 		glog.Info("Error on creating the Request ", url, ":", err)
+// 	}
+// 	req.Header.Set("X-Subscriber-ID", c.ClientID)
+// 	req.Header.Set("Content-Type", "application/json")
+// 	resp, err := c.Conn.Do(req)
+// 	if err != nil {
+// 		glog.Info("Error on sending the Request ", url, ":", err)
+// 	}
+// 	dec := json.NewDecoder(resp.Body)
+// 	for {
+// 		var message Message
+// 		err := dec.Decode(&message)
+// 		if err == nil {
+// 			if c.MessageHandler != nil {
+// 				c.MessageHandler(message)
+// 			}
+// 			if c.Debug {
+// 				glog.Info(fmt.Sprintf("%s: %s", message.Topic, message.Data))
+// 			}
+// 		}
+// 	}
+// }
 
 func (c *Client) Me() {
 	url := fmt.Sprintf("%s/me", c.HubAddr)
