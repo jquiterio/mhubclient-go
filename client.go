@@ -136,10 +136,9 @@ func (c *Client) Subscribe() (ok bool) {
 		return false
 	} else if len(c.Topics) > 0 {
 		topics = strings.Join(c.Topics, ",")
-		//body, _ = json.Marshal(c.Topics)
 		body, _ = []byte(topics)
 	}
-	fmt.Println("Topics:" + string(body))
+	fmt.Println("Topics:" + topics)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		glog.Fatal(err)
