@@ -136,7 +136,7 @@ func (c *Client) Subscribe() (ok bool) {
 		return false
 	} else if len(c.Topics) > 0 {
 		topics = strings.Join(c.Topics, ",")
-		body, _ = []byte(topics)
+		body = []byte(topics)
 	}
 	fmt.Println("Topics:" + topics)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
@@ -187,11 +187,8 @@ func (c *Client) Unsubscribe(topics []string) (ok bool) {
 
 func (c *Client) Publish(topic, payload string) {
 	url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
-	message := NewMessage(c.ClientID, topic, "publish", msg)
-	body, err := []byte(payload)
-	if err != nil {
-		glog.Fatal(err)
-	}
+	//message := NewMessage(c.ClientID, topic, "publish", msg)
+	body := []byte(payload)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
@@ -255,20 +252,20 @@ func (c *Client) GetPlainMessages() {
 					bodybytes, err := io.ReadAll(resp.Body)
 					if err == nil {
 						msg := string(bodybytes)
-						msgSplit := strings.Split(msg, ".")
-						if len(msgSplit) == 3 {
-							topic := msgSplit[0]
-							action := msgSplit[1]
-							objid := msgSplit[2]
-							if c.MessageHandler != nil {
-								message := Message{
-									SubscriberID: c.ClientID,
-									Topic:        topic,
-									Data:         action + "." + objid,
-								}
-								c.MessageHandler(message)
-							}
-						}
+						// msgSplit := strings.Split(msg, ".")
+						// if len(msgSplit) == 3 {
+						// 	topic := msgSplit[0]
+						// 	action := msgSplit[1]
+						// 	objid := msgSplit[2]
+						// 	if c.MessageHandler != nil {
+						// 		message := Message{
+						// 			Topic: topic,
+						// 			Data:  action + "." + objid,
+						// 		}
+						// 		c.MessageHandler(message)
+						// 	}
+						// }
+						c.MessageHandler(msg)
 					}
 				}
 			}
