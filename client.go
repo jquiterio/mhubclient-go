@@ -8,319 +8,154 @@
 package mhuclientgo
 
 import (
-	"bytes"
 	"crypto/tls"
-	"crypto/x509"
-	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
+	"net"
+	"os"
+	"strconv"
 	"strings"
-
-	"github.com/golang/glog"
-	"github.com/jquiterio/uuid"
+	"time"
 )
 
 type Message struct {
-	Topic   string `json:"topic"`
-	Payload string `json:"payload"`
+	SubscriberID string `json:"subscriber_id"`
+	Topic        string `json:"topic"`
+	Payload      string `json:"payload"`
 }
 
-// func NewMessage(subscriberID, topic, payload string) *Message {
-// 	return &Message{
-// 		SubscriberID: subscriberID,
-// 		ID:           uuid.NewV4().String(),
-// 		Topic:        topic,
-// 		Data:         data,
-// 	}
-// }
-
-// func (m *Message) FromMap(msg map[string]interface{}) error {
-// 	m.SubscriberID = msg["subscriber_id"].(string)
-// 	m.ID = msg["id"].(string)
-// 	m.Payload = msg["payload"].(string)
-// 	m.Topic = msg["topic"].(string)
-// 	return nil
-// }
-
-// func (m *Message) ToMap() map[string]interface{} {
-// 	return map[string]interface{}{
-// 		"subscriber_id": m.SubscriberID,
-// 		"id":            m.ID,
-// 		"topic":         m.Topic,
-// 		"payload":       m.Payload,
-// 	}
-// }
-
-// func (m *Message) ToJSON() ([]byte, error) {
-// 	return json.Marshal(m.ToMap())
-// }
-
-type Client struct {
-	ClientID       string
-	Topics         []string
-	HubAddr        string
-	MessageHandler func(msg string)
-	Conn           *http.Client
-	Secure         bool
-	Debug          bool
+type HubClient struct {
+	SubscriberID string
+	Topics       []string
+	Handler      func(Message)
+	Address      *net.TCPAddr
+	Conn         *tls.Conn
+	Debug        bool
 }
 
-func tlsCconfig(ca, crt, key string) (*tls.Config, error) {
-	certPool := x509.NewCertPool()
-	pem, err := ioutil.ReadFile(ca)
+func newTlsConfig() *tls.Config {
+	cert, err := tls.LoadX509KeyPair("certs/client.pem", "certs/client.key")
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	if ok := certPool.AppendCertsFromPEM(pem); !ok {
-		return nil, fmt.Errorf("cannot parse CA certificate")
+	config := tls.Config{
+		Certificates:       []tls.Certificate{cert},
+		InsecureSkipVerify: true,
 	}
-	cert, err := tls.LoadX509KeyPair(crt, key)
-	if err != nil {
-		return nil, err
-	}
-	return &tls.Config{
-		RootCAs:      certPool,
-		Certificates: []tls.Certificate{cert},
-	}, nil
+	return &config
 }
 
-func NewHubClient(address string, secure bool) (*Client, error) {
-	if len(address) == 0 {
-		return nil, fmt.Errorf("no hub address")
-	}
-	var conn *http.Client
-	var proto string
-	if secure {
-		proto = "https"
-		tlsconfig, err := tlsCconfig("ca.pem", "client.pem", "client.key")
-		if err != nil {
-			glog.Fatal("Error reading certs with files: ca.pem, client.crt, client.key")
-			return nil, err
-		}
-		conn = &http.Client{Transport: &http.Transport{TLSClientConfig: tlsconfig}}
-	} else {
-		proto = "http"
-		conn = http.DefaultClient
-	}
-	a, err := url.Parse(proto + "://" + address)
-	if err != nil {
-		glog.Fatal("Hub address must be a valid URL")
-		return nil, err
-	}
-
-	return &Client{
-		HubAddr:  a.String(),
-		ClientID: uuid.NewV4().String(),
-		Conn:     conn,
-	}, nil
-}
-
-func (c *Client) AddTopic(topic []string) (ok bool) {
-	if len(topic) == 0 {
-		glog.Error("no topics to add")
-		return
-	}
-	c.Topics = append(c.Topics, topic...)
-	return true
-}
-
-func (c *Client) Subscribe() (ok bool) {
-	url := fmt.Sprintf("%s/subscribe", c.HubAddr)
-	var body []byte
-	var topics string
-	if len(c.Topics) == 0 {
-		glog.Error("no topics to subscribe")
-		return false
-	} else if len(c.Topics) > 0 {
-		topics = strings.Join(c.Topics, ",")
-		body = []byte(topics)
-	}
-	fmt.Println("Topics:" + topics)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
-	if err != nil {
-		glog.Fatal(err)
-		return
-	}
-	req.Header.Set("X-Subscriber-ID", c.ClientID)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.Conn.Do(req)
-	if err != nil {
-		glog.Fatal(err)
-		return
-	}
-	if resp.StatusCode != http.StatusOK {
-		glog.Fatal("unexpected status code: ", resp.StatusCode)
-	}
-	return true
-}
-
-func (c *Client) Unsubscribe(topics []string) (ok bool) {
-	var url string
-	if len(topics) == 0 {
-		glog.Error("no topics to unsubscribe")
-		return
-	}
-	if len(topics) > 1 {
-		url = fmt.Sprintf("%s/unsubscribe", c.HubAddr)
-	} else {
-		url = fmt.Sprintf("%s/unsubscribe/%s", c.HubAddr, topics[0])
-	}
-	body, _ := json.Marshal(topics)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
-	if err != nil {
-		glog.Fatal(err)
-	}
-	req.Header.Set("X-Subscriber-ID", c.ClientID)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.Conn.Do(req)
-	if err != nil {
-		glog.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		glog.Fatal("unexpected status code: ", resp.StatusCode)
-	}
-	return true
-}
-
-func (c *Client) Publish(topic, payload string) {
-	url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
-	//message := NewMessage(c.ClientID, topic, "publish", msg)
-	body := []byte(payload)
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
-	if err != nil {
-		glog.Fatal(err)
-	}
-	req.Header.Set("X-Subscriber-ID", c.ClientID)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.Conn.Do(req)
-	if err != nil {
-		glog.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusCreated {
-		glog.Fatal("unexpected status code: ", resp.StatusCode)
+func NewMessage(subscriberID, topic, payload string) *Message {
+	return &Message{
+		SubscriberID: subscriberID,
+		Topic:        topic,
+		Payload:      payload, // "action.object.(object_id|null)"
 	}
 }
 
-// func (c *Client) PublishPlain(msg string) {
-// 	var topic string
-// 	msgSplit := strings.Split(msg, ".")
-// 	if len(msgSplit) == 3 {
-// 		topic = msgSplit[0]
-// 		action := msgSplit[1]
-// 		objid := msgSplit[2]
-// 		msg := Message{
-// 			SubscriberID: c.ClientID,
-// 			Topic:        topic,
-// 			Data:         action + "." + objid,
-// 		}
-// 		body, err := msg.ToJSON()
-
-// 		if err != nil {
-// 			glog.Fatal(err)
-// 		}
-// 		url := fmt.Sprintf("%s/publish/%s", c.HubAddr, topic)
-
-// 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
-// 		if err != nil {
-// 			glog.Fatal(err)
-// 		}
-// 		req.Header.Set("X-Subscriber-ID", c.ClientID)
-// 		req.Header.Set("Content-Type", "application/json")
-// 		resp, err := c.Conn.Do(req)
-// 		if err != nil {
-// 			glog.Fatal(err)
-// 		}
-// 		if resp.StatusCode != http.StatusCreated {
-// 			glog.Fatal("unexpected status code: ", resp.StatusCode)
-// 		}
-// 	}
-// }
-
-func (c *Client) GetPlainMessages() {
-	url := c.HubAddr
-	req, err := http.NewRequest("GET", url, nil)
-	if err == nil {
-		req.Header.Set("X-Subscriber-ID", c.ClientID)
-		resp, err := c.Conn.Do(req)
-		for {
-			if err == nil {
-				if resp.StatusCode == http.StatusOK {
-					bodybytes, err := io.ReadAll(resp.Body)
-					if err == nil {
-						msg := string(bodybytes)
-						fmt.Println(msg)
-						// msgSplit := strings.Split(msg, ".")
-						// if len(msgSplit) == 3 {
-						// 	topic := msgSplit[0]
-						// 	action := msgSplit[1]
-						// 	objid := msgSplit[2]
-						// 	if c.MessageHandler != nil {
-						// 		message := Message{
-						// 			Topic: topic,
-						// 			Data:  action + "." + objid,
-						// 		}
-						// 		c.MessageHandler(message)
-						// 	}
-						// }
-						c.MessageHandler(msg)
-					}
-				}
-			}
-		}
-	}
+// String message returns message as string
+// Format: subscriber_id.topic.payload
+func (m *Message) String() string {
+	return fmt.Sprintf("%s.%s.%s\n", m.SubscriberID, m.Topic, m.Payload)
 }
 
-// func (c *Client) GetMessages() {
-// 	url := c.HubAddr
-// 	req, err := http.NewRequest("GET", url, nil)
-// 	if err != nil {
-// 		glog.Info("Error on creating the Request ", url, ":", err)
-// 	}
-// 	req.Header.Set("X-Subscriber-ID", c.ClientID)
-// 	req.Header.Set("Content-Type", "application/json")
-// 	resp, err := c.Conn.Do(req)
-// 	if err != nil {
-// 		glog.Info("Error on sending the Request ", url, ":", err)
-// 	}
-// 	dec := json.NewDecoder(resp.Body)
-// 	for {
-// 		var message Message
-// 		err := dec.Decode(&message)
-// 		if err == nil {
-// 			if c.MessageHandler != nil {
-// 				c.MessageHandler(message)
-// 			}
-// 			if c.Debug {
-// 				glog.Info(fmt.Sprintf("%s: %s", message.Topic, message.Data))
-// 			}
-// 		}
-// 	}
-// }
+func NewHubClient(address string) *HubClient {
+	addr, err := net.ResolveTCPAddr("tcp", address)
+	if err != nil {
+		panic(err)
+	}
+	h := &HubClient{
+		Address: addr,
+		Debug:   os.Getenv("DEBUB") == "true",
+	}
+	return h
+}
 
-func (c *Client) Me() {
-	url := fmt.Sprintf("%s/me", c.HubAddr)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		glog.Fatal("Error on creating the Request ", url, ":", err)
+func (h *HubClient) Publish(topic string, payload string) {
+	defer h.Conn.Close()
+	m := NewMessage(h.SubscriberID, topic, payload)
+	msg := m.String()
+	h.Conn.Write([]byte(msg))
+}
+
+func parseMessage(msg string) (m *Message, ok bool) {
+	msgSplit := strings.Split(msg, ".")
+	if len(msgSplit) != 4 {
+		return nil, false
 	}
-	req.Header.Set("X-Subscriber-ID", c.ClientID)
-	resp, err := c.Conn.Do(req)
-	if err != nil {
-		glog.Fatal("Error on sending the Request ", url, ":", err)
-	}
-	dec := json.NewDecoder(resp.Body)
+	m = NewMessage(msgSplit[0], msgSplit[1], msgSplit[2]+"."+msgSplit[3])
+	return m, true
+}
+
+func (h *HubClient) getmessages() {
+	//defer h.Conn.Close()
 	for {
-		var message interface{}
-		err := dec.Decode(&message)
+		b := make([]byte, 1024)
+		_, err := h.Conn.Read(b)
 		if err != nil {
-			if err == io.EOF {
-				break
+			if h.Debug {
+				println("error reading: ", err)
 			}
-			glog.Fatal("Error on decoding the Response message: ", err)
+			break
+		} else {
+			inMsg := string(b)
+			if h.Debug {
+				println("got msg: ", inMsg)
+			}
+
+			m, ok := parseMessage(inMsg)
+			if !ok {
+				if h.Debug {
+					println("error parsing message: ", inMsg)
+				}
+				return
+			}
+			go h.Handler(*m)
 		}
+		time.Sleep(1 * time.Second)
 	}
 }
+
+func (h *HubClient) GetMessages() {
+	println("subscriber_id: ", h.SubscriberID)
+	for {
+		err := h.Connect()
+		if err != nil {
+			continue
+		} else {
+			h.getmessages()
+		}
+		time.Sleep(3 * time.Second)
+		println("subscriber_id: ", h.SubscriberID)
+	}
+}
+
+func (h *HubClient) Connect() error {
+	config := newTlsConfig()
+	addr := net.JoinHostPort(h.Address.IP.String(), strconv.Itoa(h.Address.Port))
+	c, err := tls.Dial("tcp", addr, config)
+	if err != nil {
+		if h.Debug {
+			println("error dialing: ", err)
+		}
+		return err
+	}
+	h.Conn = c
+	return nil
+}
+
+// USAGE:
+/*
+	debug := os.Getenv("DEBUG") == "true"
+	hub_addr := os.Getenv("HUB_ADDR")
+
+	handler := func(m Message) {
+		if debug {
+			println("sub: ", m.SubscriberID)
+			println("topic: ", m.Topic)
+			println("payload: ", m.Payload)
+		}
+	}
+	h := NewHubClient(hub_addr)
+	h.SubscriberID = "3456"
+	h.Handler = handler
+*/
