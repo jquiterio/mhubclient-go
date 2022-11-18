@@ -14,7 +14,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type Message struct {
@@ -111,7 +110,7 @@ func (h *HubClient) getmessages() {
 			}
 			go h.Handler(*m)
 		}
-		time.Sleep(1 * time.Second)
+		//time.Sleep(1 * time.Second)
 	}
 }
 
@@ -124,8 +123,6 @@ func (h *HubClient) GetMessages() {
 		} else {
 			h.getmessages()
 		}
-		time.Sleep(3 * time.Second)
-		println("subscriber_id: ", h.SubscriberID)
 	}
 }
 
@@ -133,13 +130,11 @@ func (h *HubClient) Connect() error {
 	config := newTlsConfig()
 	addr := net.JoinHostPort(h.Address.IP.String(), strconv.Itoa(h.Address.Port))
 	c, err := tls.Dial("tcp", addr, config)
-	if err != nil {
-		if h.Debug {
-			println("error dialing: ", err)
-		}
-		return err
+	if err == nil {
+		h.Conn = c
+	} else if h.Debug {
+		println("error connecting: ", err)
 	}
-	h.Conn = c
 	return nil
 }
 
