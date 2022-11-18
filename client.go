@@ -73,6 +73,7 @@ func (h *HubClient) Publish(topic string, payload string) {
 	defer h.Conn.Close()
 	m := NewMessage(h.SubscriberID, topic, payload)
 	msg := m.String()
+	h.connect()
 	go h.Conn.Write([]byte(msg))
 }
 
