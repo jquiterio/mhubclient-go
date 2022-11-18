@@ -73,7 +73,7 @@ func (h *HubClient) Publish(topic string, payload string) {
 	defer h.Conn.Close()
 	m := NewMessage(h.SubscriberID, topic, payload)
 	msg := m.String()
-	h.Conn.Write([]byte(msg))
+	go h.Conn.Write([]byte(msg))
 }
 
 func parseMessage(msg string) (m *Message, ok bool) {
@@ -117,7 +117,7 @@ func (h *HubClient) getmessages() {
 func (h *HubClient) GetMessages() {
 	println("subscriber_id: ", h.SubscriberID)
 	for {
-		err := h.Connect()
+		err := h.connect()
 		if err != nil {
 			continue
 		} else {
@@ -126,7 +126,7 @@ func (h *HubClient) GetMessages() {
 	}
 }
 
-func (h *HubClient) Connect() error {
+func (h *HubClient) connect() error {
 	config := newTlsConfig()
 	addr := net.JoinHostPort(h.Address.IP.String(), strconv.Itoa(h.Address.Port))
 	c, err := tls.Dial("tcp", addr, config)
@@ -134,6 +134,7 @@ func (h *HubClient) Connect() error {
 		h.Conn = c
 	} else if h.Debug {
 		println("error connecting: ", err)
+		return err
 	}
 	return nil
 }
