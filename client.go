@@ -14,6 +14,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Message struct {
@@ -121,11 +122,14 @@ func (h *HubClient) getmessages() {
 func (h *HubClient) GetMessages() {
 	println("subscriber_id: ", h.SubscriberID)
 	for {
-		err := h.Connect()
-		if err != nil {
-			continue
-		} else {
+		// err := h.Connect()
+		// if err == nil {
+		// 	h.getmessages()
+		// }
+		if err := h.Connect(); err == nil {
 			h.getmessages()
+		} else {
+			time.Sleep(10 * time.Second)
 		}
 	}
 }
