@@ -84,9 +84,6 @@ func (h *HubClient) Publish(topic string, payload []byte) {
 
 func defaultParser(msg string) (m *Message, ok bool) {
 	msgSplit := strings.Split(msg, ".")
-	if len(msgSplit) != 4 {
-		return nil, false
-	}
 	payload := []byte(msgSplit[2] + "." + msgSplit[3])
 	m = NewMessage(msgSplit[0], msgSplit[1], payload)
 	return m, true
